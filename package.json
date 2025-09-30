@@ -1,0 +1,31 @@
+{
+  "name": "drive-to-youtube",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "get-refresh-token": "tsx -r dotenv/config src/scripts/get-refresh-token.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "axios": "^1.7.7",
+    "dotenv": "^16.6.1",
+    "express": "^4.19.2",
+    "googleapis": "^140.0.1",
+    "open": "^10.2.0",
+    "p-limit": "^6.1.0",
+    "pino": "^9.4.0",
+    "tmp": "^0.2.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.7.5",
+    "@types/tmp": "^0.2.6",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}
