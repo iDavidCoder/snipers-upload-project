@@ -27,4 +27,7 @@ COPY package.json ./
 RUN apk add --no-cache ffmpeg yt-dlp
 
 ENV NODE_ENV=production
+# Copiar .env
+COPY .env .env
+
 CMD ["node", "dist/index.js"]
