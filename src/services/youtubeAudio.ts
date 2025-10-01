@@ -1,14 +1,27 @@
 import { spawn } from "child_process";
-import { createReadStream, promises as fs } from "fs";
+import { promises as fs } from "fs";
 import { join } from "path";
-import { createClient } from "@supabase/supabase-js";
 import { env } from "../config/env.js";
-import { tmpdir } from "os";
+
+// Pasta para armazenar arquivos de áudio temporários
+const AUDIO_DIR = join(process.cwd(), 'public', 'audios');
+
+// Garantir que a pasta existe
+async function ensureAudioDir() {
+  try {
+    await fs.mkdir(AUDIO_DIR, { recursive: true });
+  } catch (err) {
+    // Pasta já existe, ignorar erro
+  }
+}
 
 export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
   let tempAudioPath: string | undefined;
   
   try {
+    // Garantir que a pasta de áudios existe
+    await ensureAudioDir();
+    
     // Validar URL básica do YouTube
     if (!yt_url.includes('youtube.com') && !yt_url.includes('youtu.be')) {
       throw new Error("URL do YouTube inválida");
@@ -64,7 +77,7 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
     
     // Criar nome do arquivo final (agora pode ser MP3 já que ffmpeg está instalado)
     const finalFileName = `${title}-${videoId}-${timestamp}.mp3`;
-    tempAudioPath = join(tmpdir(), finalFileName);
+    tempAudioPath = join(AUDIO_DIR, finalFileName);
 
     console.log(`Baixando áudio para: ${tempAudioPath}`);
 
@@ -131,44 +144,13 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
 
     console.log(`Arquivo válido: ${stats.size} bytes`);
 
-    // Criar cliente Supabase com service role key
-    console.log(`Service Role Key existe: ${!!env.supabase.serviceRoleKey}`);
-    console.log(`Service Role Key primeiros chars: ${env.supabase.serviceRoleKey?.substring(0, 20)}...`);
+    // Gerar URL pública para servir o arquivo diretamente
+    const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` 
+      : `http://localhost:${env.port}`;
     
-    if (!env.supabase.serviceRoleKey) {
-      throw new Error("SUPABASE_SERVICE_ROLE_KEY não encontrada nas variáveis de ambiente");
-    }
-    
-    const supabase = createClient(env.supabase.url, env.supabase.serviceRoleKey);
-
-    console.log(`Fazendo upload para Supabase: ${finalFileName}`);
-
-    // Ler arquivo como buffer em vez de stream para evitar problemas de duplex
-    const fileBuffer = await fs.readFile(tempAudioPath);
-
-    // Upload para bucket Audios
-    const { error } = await supabase.storage
-      .from("Audios")
-      .upload(finalFileName, fileBuffer, {
-        upsert: true,
-        contentType: "audio/mpeg"
-      });
-
-    if (error) {
-      console.error("Erro detalhado do Supabase:", error);
-      throw new Error(`Erro ao fazer upload para Supabase: ${error.message}`);
-    }
-
-    console.log("Upload para Supabase concluído com sucesso!");
-
-    // Limpar arquivo temporário APENAS após upload bem-sucedido
-    await fs.unlink(tempAudioPath).catch((err) => {
-      console.warn("Aviso: não foi possível remover arquivo temporário:", err.message);
-    });
-
-    // Retornar URL pública
-    const publicUrl = `${env.supabase.url}/storage/v1/object/public/Audios/${finalFileName}`;
-    console.log(`Upload concluído: ${publicUrl}`);
+    const publicUrl = `${baseUrl}/audios/${finalFileName}`;
+    console.log(`Arquivo disponível em: ${publicUrl}`);
     
     return publicUrl;
 
@@ -181,5 +163,27 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
     }
     
     throw new Error(`Erro no processamento do áudio: ${error.message}`);
+  }
+}
+
+// Função para limpar arquivos antigos (opcional, pode ser chamada periodicamente)
+export async function cleanupOldAudios(maxAgeHours: number = 24) {
+  try {
+    await ensureAudioDir();
+    const files = await fs.readdir(AUDIO_DIR);
+    const now = Date.now();
+    
+    for (const file of files) {
+      const filePath = join(AUDIO_DIR, file);
+      const stats = await fs.stat(filePath);
+      const ageHours = (now - stats.mtime.getTime()) / (1000 * 60 * 60);
+      
+      if (ageHours > maxAgeHours) {
+        await fs.unlink(filePath);
+        console.log(`Arquivo antigo removido: ${file}`);
+      }
+    }
+  } catch (error) {
+    console.warn("Erro ao limpar arquivos antigos:", error);
   }
 }

@@ -10,6 +10,7 @@ import { downloadAndUploadAudio } from "../services/youtubeAudio.js";
 import { env } from "../config/env.js";
 import type { ProcessPayload } from "../types/index.js";
 import { unlink } from "fs/promises";
+import { join } from "path";
 
 const schema = z.object({
   user_id: z.string().min(1),
@@ -163,6 +164,36 @@ webhook.post("/test-ytdlp", async (req, res) => {
     return res.status(500).json({ 
       error: e.message,
       stack: e.stack
+    });
+  }
+});
+
+// Endpoint para deletar arquivo de áudio após processamento
+webhook.delete("/audio/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+    
+    // Validar nome do arquivo para segurança
+    if (!filename || !/^[a-zA-Z0-9\-_.]+\.mp3$/.test(filename)) {
+      return res.status(400).json({ error: "Nome de arquivo inválido" });
+    }
+    
+    const filePath = join(process.cwd(), "public", "audios", filename);
+    
+    await unlink(filePath);
+    
+    return res.json({ 
+      success: true, 
+      message: `Arquivo ${filename} removido com sucesso` 
+    });
+    
+  } catch (e: any) {
+    if (e.code === 'ENOENT') {
+      return res.status(404).json({ error: "Arquivo não encontrado" });
+    }
+    
+    return res.status(500).json({ 
+      error: e.message 
     });
   }
 });
