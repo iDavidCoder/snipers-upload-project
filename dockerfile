@@ -15,7 +15,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-# Etapa final (runtime)
+# Etapa final (runtime)//
 FROM node:20-alpine
 WORKDIR /app
 
