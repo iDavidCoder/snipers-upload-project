@@ -19,7 +19,21 @@ export async function simpleYtDlpDownload(options: SimpleYtDlpOptions): Promise<
   const { url, outputPath, format = 'mp3', quality = '0' } = options;
 
   // Estratégia 1: Método básico
-  let args = ["--no-warnings", "--no-check-certificate"];
+  let args = [
+    "--no-warnings",
+    "--no-check-certificate",
+    "--prefer-insecure"
+  ];
+
+  // Usar cookies.txt se existir
+  const cookiesPath = "src/cookies/cookies.txt";
+  const fs = require('fs');
+  if (fs.existsSync(cookiesPath)) {
+    args.push("--cookies", cookiesPath);
+    console.log(`✅ Usando cookies: ${cookiesPath}`);
+  } else {
+    console.log("⚠️ Nenhum cookies.txt encontrado, usando modo público");
+  }
   
   if (format === 'mp3') {
     args.push("--extract-audio", "--audio-format", "mp3", "--audio-quality", quality);

@@ -4,16 +4,26 @@
  */
 import { spawn } from "child_process";
 /**
- * Download simples e robusto sem headers complexos
+ * Download com estratégias anti-detecção progressivas
  */
 export async function simpleYtDlpDownload(options) {
     const { url, outputPath, format = 'mp3', quality = '0' } = options;
-    // Argumentos mínimos e seguros
-    const args = [
+    // Estratégia 1: Método básico
+    let args = [
         "--no-warnings",
         "--no-check-certificate",
         "--prefer-insecure"
     ];
+    // Usar cookies.txt se existir
+    const cookiesPath = "src/cookies/cookies.txt";
+    const fs = require('fs');
+    if (fs.existsSync(cookiesPath)) {
+        args.push("--cookies", cookiesPath);
+        console.log(`✅ Usando cookies: ${cookiesPath}`);
+    }
+    else {
+        console.log("⚠️ Nenhum cookies.txt encontrado, usando modo público");
+    }
     if (format === 'mp3') {
         args.push("--extract-audio", "--audio-format", "mp3", "--audio-quality", quality);
     }
@@ -21,7 +31,36 @@ export async function simpleYtDlpDownload(options) {
         args.push("--output", outputPath);
     }
     args.push(url);
-    console.log('Executando yt-dlp simples com args:', args);
+    console.log('🎯 Download - Tentativa 1 (básico):', args);
+    try {
+        return await executeYtDlpDownload(args);
+    }
+    catch (error) {
+        console.log('❌ Download básico falhou, usando anti-detecção...');
+        // Estratégia 2: Anti-detecção
+        args = [
+            "--no-warnings",
+            "--no-check-certificate",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "--add-header", "Accept-Language:en-US,en;q=0.9",
+            "--extractor-retries", "3",
+            "--sleep-interval", "2"
+        ];
+        if (format === 'mp3') {
+            args.push("--extract-audio", "--audio-format", "mp3", "--audio-quality", quality);
+        }
+        if (outputPath) {
+            args.push("--output", outputPath);
+        }
+        args.push(url);
+        console.log('🛡️ Download - Tentativa 2 (anti-detecção):', args);
+        return await executeYtDlpDownload(args);
+    }
+}
+/**
+ * Função helper para executar download
+ */
+function executeYtDlpDownload(args) {
     return new Promise((resolve, reject) => {
         const process = spawn("yt-dlp", args, {
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -40,25 +79,74 @@ export async function simpleYtDlpDownload(options) {
                 resolve(stdout);
             }
             else {
-                reject(new Error(`yt-dlp falhou com código ${code}: ${stderr}`));
+                reject(new Error(`yt-dlp download falhou (código ${code}): ${stderr}`));
             }
         });
         process.on("error", (error) => {
-            reject(new Error(`Erro ao executar yt-dlp: ${error.message}`));
+            reject(new Error(`Erro no download: ${error.message}`));
         });
     });
 }
 /**
- * Obter informações do vídeo de forma simples
+ * Obter informações do vídeo com estratégias anti-detecção para servidores
  */
 export async function simpleYtDlpInfo(url) {
-    const args = [
+    // Estratégia 1: Método básico (funciona localmente)
+    let args = [
         "--dump-json",
         "--no-warnings",
         "--no-check-certificate",
         url
     ];
-    console.log('Obtendo info com yt-dlp simples:', args);
+    console.log('🎯 Tentativa 1 - Método básico:', args);
+    try {
+        return await executeYtDlp(args);
+    }
+    catch (error) {
+        console.log('❌ Método básico falhou, tentando anti-detecção avançada...');
+        // Estratégia 2: Anti-detecção para servidores
+        args = [
+            "--dump-json",
+            "--no-warnings",
+            "--no-check-certificate",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "--add-header", "Accept-Language:en-US,en;q=0.9",
+            "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "--extractor-retries", "3",
+            "--sleep-interval", "2",
+            "--max-sleep-interval", "5",
+            url
+        ];
+        console.log('🛡️ Tentativa 2 - Anti-detecção:', args);
+        try {
+            return await executeYtDlp(args);
+        }
+        catch (error2) {
+            console.log('❌ Anti-detecção falhou, tentando método com proxy/VPN simulation...');
+            // Estratégia 3: Simular diferentes origens
+            args = [
+                "--dump-json",
+                "--no-warnings",
+                "--no-check-certificate",
+                "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15",
+                "--add-header", "Accept-Language:pt-BR,pt;q=0.9,en;q=0.8",
+                "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "--add-header", "Cache-Control:no-cache",
+                "--extractor-retries", "5",
+                "--sleep-interval", "3",
+                "--max-sleep-interval", "8",
+                "--geo-bypass",
+                url
+            ];
+            console.log('🌍 Tentativa 3 - Simulação geográfica:', args);
+            return await executeYtDlp(args);
+        }
+    }
+}
+/**
+ * Função helper para executar yt-dlp
+ */
+function executeYtDlp(args) {
     return new Promise((resolve, reject) => {
         const process = spawn("yt-dlp", args, {
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -83,11 +171,11 @@ export async function simpleYtDlpInfo(url) {
                 }
             }
             else {
-                reject(new Error(`yt-dlp info falhou: ${stderr}`));
+                reject(new Error(`yt-dlp falhou (código ${code}): ${stderr}`));
             }
         });
         process.on("error", (error) => {
-            reject(new Error(`Erro ao obter info: ${error.message}`));
+            reject(new Error(`Erro ao executar yt-dlp: ${error.message}`));
         });
     });
 }
