@@ -53,8 +53,5 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variable files
-.env*
-
 # Build artifacts que não devem ir para Docker
 dist/tmp/
