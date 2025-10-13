@@ -6,16 +6,31 @@
 import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import { fileURLToPath } from "url";
 
 /**
  * Helper para adicionar cookies se existir
  */
 function addCookiesIfAvailable(args: string[]): boolean {
+  // Para compatibilidade com ES modules, usar import.meta.url se disponível
+  let currentDir = process.cwd();
+  try {
+    // Em ES modules, __dirname não existe, então criamos um equivalente
+    if (typeof __dirname === 'undefined') {
+      currentDir = process.cwd();
+    } else {
+      currentDir = __dirname;
+    }
+  } catch {
+    currentDir = process.cwd();
+  }
+
   const cookiesPaths = [
     "src/cookies/cookies.txt",
     "./src/cookies/cookies.txt", 
     path.join(process.cwd(), "src", "cookies", "cookies.txt"),
-    path.join(__dirname, "..", "..", "cookies", "cookies.txt")
+    path.join(currentDir, "..", "..", "cookies", "cookies.txt"),
+    path.join(process.cwd(), "dist", "..", "src", "cookies", "cookies.txt")
   ];
   
   for (const cookiesPath of cookiesPaths) {
@@ -28,7 +43,7 @@ function addCookiesIfAvailable(args: string[]): boolean {
   
   console.log("⚠️ Nenhum cookies.txt encontrado nos caminhos:", cookiesPaths);
   console.log("📁 Diretório atual:", process.cwd());
-  console.log("📁 __dirname:", __dirname);
+  console.log("📁 currentDir:", currentDir);
   return false;
 }
 
