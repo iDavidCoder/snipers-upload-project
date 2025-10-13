@@ -85,13 +85,21 @@ railway logs
 - ✅ **Solucionado**: Headers HTTP convincentes em produção
 - ✅ **Fallback**: User-Agent realista, delays, retry automático
 
-### 2. Erro de CORS
+### 2. Alpine 3.22+ "externally-managed-environment"
+- ✅ **Solucionado**: `--break-system-packages` no pip
+- ✅ **Método**: `python3 -m pip install --upgrade --break-system-packages yt-dlp`
+
+### 3. TypeScript Build "tsc: not found"
+- ✅ **Solucionado**: `npm ci` instala devDependencies para build
+- ✅ **Otimização**: `npm prune --production` após build
+
+### 4. Erro de CORS
 - ✅ **Prevenido**: CORS configurado no Express
 
-### 3. Timeout nos Downloads
+### 5. Timeout nos Downloads
 - ✅ **Mitigado**: Retry automático e configurações otimizadas
 
-### 4. Espaço em Disco
+### 6. Espaço em Disco
 - ✅ **Gerenciado**: Cleanup automático de arquivos antigos
 
 ## 📊 Monitoramento

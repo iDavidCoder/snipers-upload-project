@@ -1,9 +1,9 @@
-# Dockerfile simples e funcional para Railway
+# Dockerfile alternativo - versão mais simples
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Instalar dependências do sistema
+# Instalar tudo que precisamos
 RUN apk update && apk add --no-cache \
     python3 \
     py3-pip \
@@ -21,13 +21,13 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY railway-setup.sh ./
 
-# Instalar ALL dependencies (including devDependencies for build)
+# Instalar dependências (incluindo dev para build)
 RUN npm ci
 
 # Compilar TypeScript
 RUN npm run build
 
-# Remover devDependencies para reduzir tamanho
+# Limpar devDependencies após build
 RUN npm prune --production
 
 # Configurar permissions e diretórios
