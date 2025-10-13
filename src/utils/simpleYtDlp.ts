@@ -35,13 +35,34 @@ function addCookiesIfAvailable(args: string[]): boolean {
   
   for (const cookiesPath of cookiesPaths) {
     if (fs.existsSync(cookiesPath)) {
-      args.push("--cookies", cookiesPath);
-      console.log(`✅ Usando cookies: ${cookiesPath}`);
-      return true;
+      // Verificar se o arquivo não está vazio e tem conteúdo válido
+      try {
+        const content = fs.readFileSync(cookiesPath, 'utf-8');
+        const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+        
+        if (lines.length > 0) {
+          args.push("--cookies", cookiesPath);
+          console.log(`✅ Usando cookies: ${cookiesPath} (${lines.length} cookies válidos)`);
+          
+          // Verificar se há cookies do YouTube especificamente
+          const youtubeCookies = lines.filter(line => line.includes('youtube.com') || line.includes('.youtube.com'));
+          if (youtubeCookies.length > 0) {
+            console.log(`📺 Encontrados ${youtubeCookies.length} cookies do YouTube`);
+          } else {
+            console.log(`⚠️ Nenhum cookie específico do YouTube encontrado`);
+          }
+          
+          return true;
+        } else {
+          console.log(`⚠️ Cookies encontrado mas vazio: ${cookiesPath}`);
+        }
+      } catch (err) {
+        console.log(`❌ Erro ao ler cookies: ${cookiesPath}`, err);
+      }
     }
   }
   
-  console.log("⚠️ Nenhum cookies.txt encontrado nos caminhos:", cookiesPaths);
+  console.log("⚠️ Nenhum cookies.txt válido encontrado nos caminhos:", cookiesPaths);
   console.log("📁 Diretório atual:", process.cwd());
   console.log("📁 currentDir:", currentDir);
   return false;
@@ -216,7 +237,33 @@ export async function simpleYtDlpInfo(url: string): Promise<any> {
       args.push(url);
 
       console.log('🌍 Tentativa 3 - Simulação geográfica:', args);
-      return await executeYtDlp(args);
+      
+      try {
+        return await executeYtDlp(args);
+      } catch (error3: any) {
+        console.log('❌ Simulação geográfica falhou, tentando sem cookies como último recurso...');
+        
+        // Estratégia 4: Sem cookies, máxima agressividade anti-detecção
+        args = [
+          "--dump-json", 
+          "--no-warnings",
+          "--no-check-certificate",
+          "--user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "--add-header", "Accept-Language:en-US,en;q=0.5",
+          "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "--add-header", "Cache-Control:no-cache",
+          "--add-header", "DNT:1",
+          "--extractor-retries", "10",
+          "--sleep-interval", "5",
+          "--max-sleep-interval", "15", 
+          "--geo-bypass",
+          "--force-ipv4",
+          url
+        ];
+
+        console.log('🔓 Tentativa 4 - Sem cookies (modo público):', args);
+        return await executeYtDlp(args);
+      }
     }
   }
 }
