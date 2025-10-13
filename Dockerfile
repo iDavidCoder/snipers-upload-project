@@ -21,6 +21,9 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY railway-setup.sh ./
 
+# Copiar .env
+COPY .env .env
+
 # Instalar ALL dependencies (including devDependencies for build)
 RUN npm ci
 
