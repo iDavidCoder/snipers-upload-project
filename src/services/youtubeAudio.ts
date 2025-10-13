@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { env } from "../config/env.js";
+import { getYtDlpArgs, exportChromeCookies } from "../utils/cookies.js";
 
 // Pasta para armazenar arquivos de áudio temporários
 const AUDIO_DIR = join(process.cwd(), 'public', 'audios');
@@ -27,15 +28,32 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
       throw new Error("URL do YouTube inválida");
     }
 
+    // Tentar exportar cookies do Chrome primeiro (para evitar bloqueio de bot)
+    try {
+      await exportChromeCookies();
+    } catch (error) {
+      console.warn('Não foi possível exportar cookies, continuando sem eles...');
+    }
+
     // Primeiro, obter metadados do vídeo
     console.log(`Obtendo informações do vídeo: ${yt_url}`);
     
+    const baseInfoArgs = [
+      "--dump-json",
+      "--no-warnings", 
+      "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "--add-header", "Accept-Language:en-US,en;q=0.9",
+      "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "--extractor-retries", "3",
+      "--sleep-interval", "1",
+      "--max-sleep-interval", "3",
+      yt_url
+    ];
+
+    const infoArgs = await getYtDlpArgs(baseInfoArgs);
+    
     const videoInfo = await new Promise<any>((resolve, reject) => {
-      const ytdlp = spawn("yt-dlp", [
-        "--dump-json",
-        "--no-warnings",
-        yt_url
-      ], {
+      const ytdlp = spawn("yt-dlp", infoArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
@@ -82,16 +100,26 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
     console.log(`Baixando áudio para: ${tempAudioPath}`);
 
     // Agora baixar o áudio e converter para MP3 (ffmpeg disponível)
+    const baseDownloadArgs = [
+      "--extract-audio",
+      "--audio-format", "mp3",
+      "--audio-quality", "0",
+      "--no-playlist",
+      "--no-warnings",
+      "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "--add-header", "Accept-Language:en-US,en;q=0.9",
+      "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "--extractor-retries", "3",
+      "--sleep-interval", "1",
+      "--max-sleep-interval", "3",
+      "--output", tempAudioPath!,
+      yt_url
+    ];
+
+    const downloadArgs = await getYtDlpArgs(baseDownloadArgs);
+    
     await new Promise<void>((resolve, reject) => {
-      const ytdlp = spawn("yt-dlp", [
-        "--extract-audio",
-        "--audio-format", "mp3",
-        "--audio-quality", "0",
-        "--no-playlist",
-        "--no-warnings",
-        "--output", tempAudioPath!,
-        yt_url
-      ], {
+      const ytdlp = spawn("yt-dlp", downloadArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }

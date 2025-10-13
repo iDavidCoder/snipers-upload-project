@@ -1,0 +1,60 @@
+# Node modules e arquivos temporários
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Arquivos de desenvolvimento
+.env.local
+.env.development
+.env.test
+
+# Arquivos temporários
+*.tmp
+*.temp
+public/audios/*
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+
+# Git
+.git
+.gitignore
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variable files
+.env*
+
+# Build artifacts que não devem ir para Docker
+dist/tmp/

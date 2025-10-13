@@ -1,24 +1,51 @@
 import { spawn } from "child_process";
 import { promises as fs } from "fs";
 import { join } from "path";
-import { createClient } from "@supabase/supabase-js";
 import { env } from "../config/env.js";
-import { tmpdir } from "os";
+import { getYtDlpArgs, exportChromeCookies } from "../utils/cookies.js";
+// Pasta para armazenar arquivos de áudio temporários
+const AUDIO_DIR = join(process.cwd(), 'public', 'audios');
+// Garantir que a pasta existe
+async function ensureAudioDir() {
+    try {
+        await fs.mkdir(AUDIO_DIR, { recursive: true });
+    }
+    catch (err) {
+        // Pasta já existe, ignorar erro
+    }
+}
 export async function downloadAndUploadAudio(yt_url) {
     let tempAudioPath;
     try {
+        // Garantir que a pasta de áudios existe
+        await ensureAudioDir();
         // Validar URL básica do YouTube
         if (!yt_url.includes('youtube.com') && !yt_url.includes('youtu.be')) {
             throw new Error("URL do YouTube inválida");
         }
+        // Tentar exportar cookies do Chrome primeiro (para evitar bloqueio de bot)
+        try {
+            await exportChromeCookies();
+        }
+        catch (error) {
+            console.warn('Não foi possível exportar cookies, continuando sem eles...');
+        }
         // Primeiro, obter metadados do vídeo
         console.log(`Obtendo informações do vídeo: ${yt_url}`);
+        const baseInfoArgs = [
+            "--dump-json",
+            "--no-warnings",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "--add-header", "Accept-Language:en-US,en;q=0.9",
+            "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "--extractor-retries", "3",
+            "--sleep-interval", "1",
+            "--max-sleep-interval", "3",
+            yt_url
+        ];
+        const infoArgs = await getYtDlpArgs(baseInfoArgs);
         const videoInfo = await new Promise((resolve, reject) => {
-            const ytdlp = spawn("yt-dlp", [
-                "--dump-json",
-                "--no-warnings",
-                yt_url
-            ], {
+            const ytdlp = spawn("yt-dlp", infoArgs, {
                 stdio: ['pipe', 'pipe', 'pipe'],
                 shell: true,
                 env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
@@ -53,19 +80,27 @@ export async function downloadAndUploadAudio(yt_url) {
         const timestamp = Date.now();
         // Criar nome do arquivo final (agora pode ser MP3 já que ffmpeg está instalado)
         const finalFileName = `${title}-${videoId}-${timestamp}.mp3`;
-        tempAudioPath = join(tmpdir(), finalFileName);
+        tempAudioPath = join(AUDIO_DIR, finalFileName);
         console.log(`Baixando áudio para: ${tempAudioPath}`);
         // Agora baixar o áudio e converter para MP3 (ffmpeg disponível)
+        const baseDownloadArgs = [
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "--no-playlist",
+            "--no-warnings",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "--add-header", "Accept-Language:en-US,en;q=0.9",
+            "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "--extractor-retries", "3",
+            "--sleep-interval", "1",
+            "--max-sleep-interval", "3",
+            "--output", tempAudioPath,
+            yt_url
+        ];
+        const downloadArgs = await getYtDlpArgs(baseDownloadArgs);
         await new Promise((resolve, reject) => {
-            const ytdlp = spawn("yt-dlp", [
-                "--extract-audio",
-                "--audio-format", "mp3",
-                "--audio-quality", "0",
-                "--no-playlist",
-                "--no-warnings",
-                "--output", tempAudioPath,
-                yt_url
-            ], {
+            const ytdlp = spawn("yt-dlp", downloadArgs, {
                 stdio: ['pipe', 'pipe', 'pipe'],
                 shell: true,
                 env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
@@ -108,35 +143,12 @@ export async function downloadAndUploadAudio(yt_url) {
             throw new Error("Arquivo de áudio está vazio");
         }
         console.log(`Arquivo válido: ${stats.size} bytes`);
-        // Criar cliente Supabase com service role key
-        console.log(`Service Role Key existe: ${!!env.supabase.serviceRoleKey}`);
-        console.log(`Service Role Key primeiros chars: ${env.supabase.serviceRoleKey?.substring(0, 20)}...`);
-        if (!env.supabase.serviceRoleKey) {
-            throw new Error("SUPABASE_SERVICE_ROLE_KEY não encontrada nas variáveis de ambiente");
-        }
-        const supabase = createClient(env.supabase.url, env.supabase.serviceRoleKey);
-        console.log(`Fazendo upload para Supabase: ${finalFileName}`);
-        // Ler arquivo como buffer em vez de stream para evitar problemas de duplex
-        const fileBuffer = await fs.readFile(tempAudioPath);
-        // Upload para bucket Audios
-        const { error } = await supabase.storage
-            .from("Audios")
-            .upload(finalFileName, fileBuffer, {
-            upsert: true,
-            contentType: "audio/mpeg"
-        });
-        if (error) {
-            console.error("Erro detalhado do Supabase:", error);
-            throw new Error(`Erro ao fazer upload para Supabase: ${error.message}`);
-        }
-        console.log("Upload para Supabase concluído com sucesso!");
-        // Limpar arquivo temporário APENAS após upload bem-sucedido
-        await fs.unlink(tempAudioPath).catch((err) => {
-            console.warn("Aviso: não foi possível remover arquivo temporário:", err.message);
-        });
-        // Retornar URL pública
-        const publicUrl = `${env.supabase.url}/storage/v1/object/public/Audios/${finalFileName}`;
-        console.log(`Upload concluído: ${publicUrl}`);
+        // Gerar URL pública para servir o arquivo diretamente
+        const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+            ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+            : `http://localhost:${env.port}`;
+        const publicUrl = `${baseUrl}/audios/${finalFileName}`;
+        console.log(`Arquivo disponível em: ${publicUrl}`);
         return publicUrl;
     }
     catch (error) {
@@ -146,5 +158,25 @@ export async function downloadAndUploadAudio(yt_url) {
             await fs.unlink(tempAudioPath).catch(() => { });
         }
         throw new Error(`Erro no processamento do áudio: ${error.message}`);
+    }
+}
+// Função para limpar arquivos antigos (opcional, pode ser chamada periodicamente)
+export async function cleanupOldAudios(maxAgeHours = 24) {
+    try {
+        await ensureAudioDir();
+        const files = await fs.readdir(AUDIO_DIR);
+        const now = Date.now();
+        for (const file of files) {
+            const filePath = join(AUDIO_DIR, file);
+            const stats = await fs.stat(filePath);
+            const ageHours = (now - stats.mtime.getTime()) / (1000 * 60 * 60);
+            if (ageHours > maxAgeHours) {
+                await fs.unlink(filePath);
+                console.log(`Arquivo antigo removido: ${file}`);
+            }
+        }
+    }
+    catch (error) {
+        console.warn("Erro ao limpar arquivos antigos:", error);
     }
 }
