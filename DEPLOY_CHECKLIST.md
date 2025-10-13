@@ -2,11 +2,12 @@
 
 ## 🏗️ Arquivos Configurados
 
-- [x] **Dockerfile** - Configurado com Python, yt-dlp, ffmpeg
+- [x] **Dockerfile** - Corrigido para Alpine 3.22+ com `--break-system-packages`
 - [x] **railway.toml** - Build configurado para usar Dockerfile  
 - [x] **.dockerignore** - Otimização do build
-- [x] **railway-setup.sh** - Script de inicialização
+- [x] **railway-setup.sh** - Script de inicialização melhorado com testes
 - [x] **Código atualizado** - Anti-detecção para produção sem Chrome
+- [x] **Scripts de teste** - `test-docker.bat` e `test-docker.sh` para testar localmente
 
 ## 🔧 Configurações Necessárias no Railway
 
