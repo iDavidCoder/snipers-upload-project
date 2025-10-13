@@ -23,6 +23,7 @@ COPY railway-setup.sh ./
 
 # Copiar .env
 COPY .env .env
+COPY src/cookies/cookies.txt src/cookies/cookies.txt
 
 # Instalar ALL dependencies (including devDependencies for build)
 RUN npm ci
