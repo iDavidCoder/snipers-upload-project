@@ -3,6 +3,30 @@
  * Usa configurações mínimas que funcionam consistentemente
  */
 import { spawn } from "child_process";
+import * as path from "path";
+import * as fs from "fs";
+/**
+ * Helper para adicionar cookies se existir
+ */
+function addCookiesIfAvailable(args) {
+    const cookiesPaths = [
+        "src/cookies/cookies.txt",
+        "./src/cookies/cookies.txt",
+        path.join(process.cwd(), "src", "cookies", "cookies.txt"),
+        path.join(__dirname, "..", "..", "cookies", "cookies.txt")
+    ];
+    for (const cookiesPath of cookiesPaths) {
+        if (fs.existsSync(cookiesPath)) {
+            args.push("--cookies", cookiesPath);
+            console.log(`✅ Usando cookies: ${cookiesPath}`);
+            return true;
+        }
+    }
+    console.log("⚠️ Nenhum cookies.txt encontrado nos caminhos:", cookiesPaths);
+    console.log("📁 Diretório atual:", process.cwd());
+    console.log("📁 __dirname:", __dirname);
+    return false;
+}
 /**
  * Download com estratégias anti-detecção progressivas
  */
@@ -14,29 +38,8 @@ export async function simpleYtDlpDownload(options) {
         "--no-check-certificate",
         "--prefer-insecure"
     ];
-    // Usar cookies.txt se existir - testar múltiplos caminhos
-    const path = require('path');
-    const fs = require('fs');
-    const cookiesPaths = [
-        "src/cookies/cookies.txt",
-        "./src/cookies/cookies.txt",
-        path.join(process.cwd(), "src", "cookies", "cookies.txt"),
-        path.join(__dirname, "..", "..", "cookies", "cookies.txt")
-    ];
-    let cookiesFound = false;
-    for (const cookiesPath of cookiesPaths) {
-        if (fs.existsSync(cookiesPath)) {
-            args.push("--cookies", cookiesPath);
-            console.log(`✅ Usando cookies: ${cookiesPath}`);
-            cookiesFound = true;
-            break;
-        }
-    }
-    if (!cookiesFound) {
-        console.log("⚠️ Nenhum cookies.txt encontrado nos caminhos:", cookiesPaths);
-        console.log("📁 Diretório atual:", process.cwd());
-        console.log("📁 __dirname:", __dirname);
-    }
+    // Usar cookies.txt se existir
+    addCookiesIfAvailable(args);
     if (format === 'mp3') {
         args.push("--extract-audio", "--audio-format", "mp3", "--audio-quality", quality);
     }
@@ -60,13 +63,7 @@ export async function simpleYtDlpDownload(options) {
             "--sleep-interval", "2"
         ];
         // Usar cookies também na segunda tentativa
-        for (const cookiesPath of cookiesPaths) {
-            if (fs.existsSync(cookiesPath)) {
-                args.push("--cookies", cookiesPath);
-                console.log(`🛡️ Anti-detecção usando cookies: ${cookiesPath}`);
-                break;
-            }
-        }
+        addCookiesIfAvailable(args);
         if (format === 'mp3') {
             args.push("--extract-audio", "--audio-format", "mp3", "--audio-quality", quality);
         }
@@ -116,9 +113,11 @@ export async function simpleYtDlpInfo(url) {
     let args = [
         "--dump-json",
         "--no-warnings",
-        "--no-check-certificate",
-        url
+        "--no-check-certificate"
     ];
+    // Adicionar cookies se disponível
+    addCookiesIfAvailable(args);
+    args.push(url);
     console.log('🎯 Tentativa 1 - Método básico:', args);
     try {
         return await executeYtDlp(args);
@@ -135,9 +134,11 @@ export async function simpleYtDlpInfo(url) {
             "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "--extractor-retries", "3",
             "--sleep-interval", "2",
-            "--max-sleep-interval", "5",
-            url
+            "--max-sleep-interval", "5"
         ];
+        // Adicionar cookies se disponível  
+        addCookiesIfAvailable(args);
+        args.push(url);
         console.log('🛡️ Tentativa 2 - Anti-detecção:', args);
         try {
             return await executeYtDlp(args);
@@ -156,9 +157,11 @@ export async function simpleYtDlpInfo(url) {
                 "--extractor-retries", "5",
                 "--sleep-interval", "3",
                 "--max-sleep-interval", "8",
-                "--geo-bypass",
-                url
+                "--geo-bypass"
             ];
+            // Adicionar cookies se disponível
+            addCookiesIfAvailable(args);
+            args.push(url);
             console.log('🌍 Tentativa 3 - Simulação geográfica:', args);
             return await executeYtDlp(args);
         }
