@@ -29,6 +29,17 @@ echo "📁 Criando diretórios..."
 mkdir -p /app/public/audios
 chmod 755 /app/public/audios
 
+# Verificar se cookies.txt existe
+echo "🍪 Verificando cookies..."
+if [ -f "src/cookies/cookies.txt" ]; then
+    echo "✅ cookies.txt encontrado: $(wc -l < src/cookies/cookies.txt) linhas"
+    head -3 src/cookies/cookies.txt | tail -1 | cut -c1-50
+else
+    echo "❌ cookies.txt NÃO encontrado!"
+    echo "📁 Conteúdo de src/cookies/:"
+    ls -la src/cookies/ || echo "Diretório cookies não existe"
+fi
+
 # Verificar variáveis de ambiente necessárias
 echo "🔧 Verificando variáveis de ambiente..."
 if [ -z "$PORT" ]; then

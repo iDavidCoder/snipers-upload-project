@@ -25,14 +25,31 @@ export async function simpleYtDlpDownload(options: SimpleYtDlpOptions): Promise<
     "--prefer-insecure"
   ];
 
-  // Usar cookies.txt se existir
-  const cookiesPath = "src/cookies/cookies.txt";
+  // Usar cookies.txt se existir - testar múltiplos caminhos
+  const path = require('path');
   const fs = require('fs');
-  if (fs.existsSync(cookiesPath)) {
-    args.push("--cookies", cookiesPath);
-    console.log(`✅ Usando cookies: ${cookiesPath}`);
-  } else {
-    console.log("⚠️ Nenhum cookies.txt encontrado, usando modo público");
+  
+  const cookiesPaths = [
+    "src/cookies/cookies.txt",
+    "./src/cookies/cookies.txt", 
+    path.join(process.cwd(), "src", "cookies", "cookies.txt"),
+    path.join(__dirname, "..", "..", "cookies", "cookies.txt")
+  ];
+  
+  let cookiesFound = false;
+  for (const cookiesPath of cookiesPaths) {
+    if (fs.existsSync(cookiesPath)) {
+      args.push("--cookies", cookiesPath);
+      console.log(`✅ Usando cookies: ${cookiesPath}`);
+      cookiesFound = true;
+      break;
+    }
+  }
+  
+  if (!cookiesFound) {
+    console.log("⚠️ Nenhum cookies.txt encontrado nos caminhos:", cookiesPaths);
+    console.log("📁 Diretório atual:", process.cwd());
+    console.log("📁 __dirname:", __dirname);
   }
   
   if (format === 'mp3') {
@@ -61,6 +78,15 @@ export async function simpleYtDlpDownload(options: SimpleYtDlpOptions): Promise<
       "--extractor-retries", "3",
       "--sleep-interval", "2"
     ];
+    
+    // Usar cookies também na segunda tentativa
+    for (const cookiesPath of cookiesPaths) {
+      if (fs.existsSync(cookiesPath)) {
+        args.push("--cookies", cookiesPath);
+        console.log(`🛡️ Anti-detecção usando cookies: ${cookiesPath}`);
+        break;
+      }
+    }
     
     if (format === 'mp3') {
       args.push("--extract-audio", "--audio-format", "mp3", "--audio-quality", quality);
