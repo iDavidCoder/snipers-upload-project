@@ -1,8 +1,8 @@
-import { spawn } from "child_process";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { env } from "../config/env.js";
-import { getYtDlpArgs, exportChromeCookies } from "../utils/cookies.js";
+import { sanitizeYouTubeUrl } from "../utils/sanitizer.js";
+import { simpleYtDlpDownload, simpleYtDlpInfo } from "../utils/simpleYtDlp.js";
 // Pasta para armazenar arquivos de áudio temporários
 const AUDIO_DIR = join(process.cwd(), 'public', 'audios');
 // Garantir que a pasta existe
@@ -19,120 +19,30 @@ export async function downloadAndUploadAudio(yt_url) {
     try {
         // Garantir que a pasta de áudios existe
         await ensureAudioDir();
-        // Validar URL básica do YouTube
-        if (!yt_url.includes('youtube.com') && !yt_url.includes('youtu.be')) {
-            throw new Error("URL do YouTube inválida");
-        }
-        // Tentar exportar cookies do Chrome primeiro (para evitar bloqueio de bot)
-        try {
-            await exportChromeCookies();
-        }
-        catch (error) {
-            console.warn('Não foi possível exportar cookies, continuando sem eles...');
-        }
-        // Primeiro, obter metadados do vídeo
-        console.log(`Obtendo informações do vídeo: ${yt_url}`);
-        const baseInfoArgs = [
-            "--dump-json",
-            "--no-warnings",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "--add-header", "Accept-Language:en-US,en;q=0.9",
-            "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "--extractor-retries", "3",
-            "--sleep-interval", "1",
-            "--max-sleep-interval", "3",
-            yt_url
-        ];
-        const infoArgs = await getYtDlpArgs(baseInfoArgs);
-        const videoInfo = await new Promise((resolve, reject) => {
-            const ytdlp = spawn("yt-dlp", infoArgs, {
-                stdio: ['pipe', 'pipe', 'pipe'],
-                shell: true,
-                env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-            });
-            let stdout = "";
-            let stderr = "";
-            ytdlp.stdout.on("data", (data) => {
-                stdout += data.toString();
-            });
-            ytdlp.stderr.on("data", (data) => {
-                stderr += data.toString();
-            });
-            ytdlp.on("close", (code) => {
-                if (code !== 0) {
-                    reject(new Error(`Falha ao obter informações do vídeo: ${stderr}`));
-                    return;
-                }
-                try {
-                    const info = JSON.parse(stdout);
-                    resolve(info);
-                }
-                catch (e) {
-                    reject(new Error("Falha ao parsear informações do vídeo"));
-                }
-            });
-            ytdlp.on("error", (err) => {
-                reject(new Error(`Erro ao executar yt-dlp: ${err.message}`));
-            });
-        });
+        // Validar e sanitizar URL do YouTube
+        const sanitizedUrl = sanitizeYouTubeUrl(yt_url);
+        console.log(`🎯 Processando: ${sanitizedUrl}`);
+        // Obter informações do vídeo
+        console.log('📋 Obtendo informações do vídeo...');
+        const videoInfo = await simpleYtDlpInfo(sanitizedUrl);
         const title = videoInfo.title?.replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').substring(0, 50) || 'audio';
         const videoId = videoInfo.id || Math.random().toString(36).substring(7);
         const timestamp = Date.now();
-        // Criar nome do arquivo final (agora pode ser MP3 já que ffmpeg está instalado)
+        // Criar nome do arquivo final
         const finalFileName = `${title}-${videoId}-${timestamp}.mp3`;
         tempAudioPath = join(AUDIO_DIR, finalFileName);
-        console.log(`Baixando áudio para: ${tempAudioPath}`);
-        // Agora baixar o áudio e converter para MP3 (ffmpeg disponível)
-        const baseDownloadArgs = [
-            "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "--no-playlist",
-            "--no-warnings",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "--add-header", "Accept-Language:en-US,en;q=0.9",
-            "--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "--extractor-retries", "3",
-            "--sleep-interval", "1",
-            "--max-sleep-interval", "3",
-            "--output", tempAudioPath,
-            yt_url
-        ];
-        const downloadArgs = await getYtDlpArgs(baseDownloadArgs);
-        await new Promise((resolve, reject) => {
-            const ytdlp = spawn("yt-dlp", downloadArgs, {
-                stdio: ['pipe', 'pipe', 'pipe'],
-                shell: true,
-                env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-            });
-            let stderr = "";
-            let stdout = "";
-            ytdlp.stdout.on("data", (data) => {
-                const output = data.toString();
-                stdout += output;
-                console.log("yt-dlp stdout:", output.trim());
-            });
-            ytdlp.stderr.on("data", (data) => {
-                const output = data.toString();
-                stderr += output;
-                console.log("yt-dlp stderr:", output.trim());
-            });
-            ytdlp.on("close", (code) => {
-                console.log(`yt-dlp download exited with code: ${code}`);
-                if (code !== 0) {
-                    reject(new Error(`Falha no download do áudio (código ${code}): ${stderr}`));
-                    return;
-                }
-                resolve();
-            });
-            ytdlp.on("error", (err) => {
-                reject(new Error(`Erro ao executar yt-dlp: ${err.message}`));
-            });
+        console.log(`📥 Baixando áudio: ${finalFileName}`);
+        // Fazer download do áudio
+        await simpleYtDlpDownload({
+            url: sanitizedUrl,
+            outputPath: tempAudioPath,
+            format: 'mp3',
+            quality: '0'
         });
         // Verificar se o arquivo foi criado
         try {
             await fs.access(tempAudioPath);
-            console.log(`Arquivo criado com sucesso: ${tempAudioPath}`);
+            console.log(`✅ Arquivo criado: ${tempAudioPath}`);
         }
         catch {
             throw new Error("Arquivo de áudio não foi gerado");
@@ -142,17 +52,17 @@ export async function downloadAndUploadAudio(yt_url) {
         if (stats.size === 0) {
             throw new Error("Arquivo de áudio está vazio");
         }
-        console.log(`Arquivo válido: ${stats.size} bytes`);
-        // Gerar URL pública para servir o arquivo diretamente
+        console.log(`📊 Arquivo válido: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+        // Gerar URL pública
         const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN
             ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
             : `http://localhost:${env.port}`;
         const publicUrl = `${baseUrl}/audios/${finalFileName}`;
-        console.log(`Arquivo disponível em: ${publicUrl}`);
+        console.log(`🌐 Arquivo disponível: ${publicUrl}`);
         return publicUrl;
     }
     catch (error) {
-        console.error("Erro geral:", error);
+        console.error("❌ Erro no processamento:", error.message);
         // Limpar arquivo temporário em caso de erro
         if (tempAudioPath) {
             await fs.unlink(tempAudioPath).catch(() => { });
@@ -160,7 +70,7 @@ export async function downloadAndUploadAudio(yt_url) {
         throw new Error(`Erro no processamento do áudio: ${error.message}`);
     }
 }
-// Função para limpar arquivos antigos (opcional, pode ser chamada periodicamente)
+// Função para limpar arquivos antigos
 export async function cleanupOldAudios(maxAgeHours = 24) {
     try {
         await ensureAudioDir();
@@ -172,11 +82,11 @@ export async function cleanupOldAudios(maxAgeHours = 24) {
             const ageHours = (now - stats.mtime.getTime()) / (1000 * 60 * 60);
             if (ageHours > maxAgeHours) {
                 await fs.unlink(filePath);
-                console.log(`Arquivo antigo removido: ${file}`);
+                console.log(`🗑️ Arquivo antigo removido: ${file}`);
             }
         }
     }
     catch (error) {
-        console.warn("Erro ao limpar arquivos antigos:", error);
+        console.warn("⚠️ Erro ao limpar arquivos antigos:", error);
     }
 }

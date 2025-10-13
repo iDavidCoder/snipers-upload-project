@@ -105,7 +105,7 @@ webhook.post("/test-ytdlp", async (req, res) => {
                 yt_url
             ], {
                 stdio: ['pipe', 'pipe', 'pipe'],
-                shell: true,
+                shell: false, // Removido shell: true para evitar problemas de sintaxe
                 env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
             });
             let stdout = "";

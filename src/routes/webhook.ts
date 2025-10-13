@@ -11,6 +11,7 @@ import { env } from "../config/env.js";
 import type { ProcessPayload } from "../types/index.js";
 import { unlink } from "fs/promises";
 import { join } from "path";
+import { sanitizeYouTubeUrl } from "../utils/sanitizer.js";
 
 const schema = z.object({
   user_id: z.string().min(1),
@@ -123,7 +124,7 @@ webhook.post("/test-ytdlp", async (req, res) => {
         yt_url
       ], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true,
+        shell: false, // Removido shell: true para evitar problemas de sintaxe
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       });
 
