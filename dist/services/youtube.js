@@ -20,13 +20,24 @@ export class YouTubeAudioService {
         const fileName = `audio_${Date.now()}.mp3`;
         const outputPath = path.join(this.downloadDir, fileName);
         try {
-            // Comando yt-dlp simples para Railway - SEM cookies
-            const command = `yt-dlp -x --audio-format mp3 --audio-quality 5 -o "${outputPath}" "${url}"`;
-            console.log('Downloading with yt-dlp:', command);
-            await execAsync(command, {
-                timeout: 60000,
-                env: { ...process.env }
-            });
+            // Para Railway - tentar com cookies do Chrome primeiro
+            let command = `yt-dlp --cookies-from-browser chrome -x --audio-format mp3 --audio-quality 5 -o "${outputPath}" "${url}"`;
+            console.log('Downloading with yt-dlp (with cookies):', command);
+            try {
+                await execAsync(command, {
+                    timeout: 60000,
+                    env: { ...process.env }
+                });
+            }
+            catch (cookieError) {
+                console.warn('Cookie method failed, trying without cookies:', cookieError);
+                // Fallback sem cookies
+                command = `yt-dlp -x --audio-format mp3 --audio-quality 5 -o "${outputPath}" "${url}"`;
+                await execAsync(command, {
+                    timeout: 60000,
+                    env: { ...process.env }
+                });
+            }
             // Verificar se o arquivo foi criado
             await fs.access(outputPath);
             return {

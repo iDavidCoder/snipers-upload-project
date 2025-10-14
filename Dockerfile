@@ -1,29 +1,33 @@
-# Dockerfile simples e funcional para Railway
+# Dockerfile para Railway com yt-dlp e cookies
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Instalar dependências do sistema
+# Instalar dependências do sistema incluindo Chromium para cookies
 RUN apk update && apk add --no-cache \
     python3 \
     py3-pip \
     ffmpeg \
     curl \
     ca-certificates \
-    bash
+    bash \
+    chromium \
+    chromium-chromedriver
 
 # Instalar yt-dlp
 RUN python3 -m pip install --upgrade --break-system-packages yt-dlp
+
+# Configurar Chromium para container
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV CHROME_PATH=/usr/bin/chromium-browser
 
 # Copiar arquivos do projeto
 COPY package.json package-lock.json* ./
 COPY tsconfig.json ./
 COPY src ./src
-COPY railway-setup.sh ./
 
-# Copiar .env
-COPY .env .env
-COPY src/cookies/cookies.txt src/cookies/cookies.txt
+# Copiar .env se existir
+COPY .env* ./
 
 # Instalar ALL dependencies (including devDependencies for build)
 RUN npm ci
@@ -34,14 +38,13 @@ RUN npm run build
 # Remover devDependencies para reduzir tamanho
 RUN npm prune --production
 
-# Configurar permissions e diretórios
-RUN chmod +x railway-setup.sh && \
-    mkdir -p /app/public/audios
+# Criar diretório tmp para downloads
+RUN mkdir -p tmp && chmod 777 tmp
 
 # Configurar ambiente
 ENV NODE_ENV=production
 ENV PYTHONIOENCODING=utf-8
 
-EXPOSE 3000
+EXPOSE 8080
 
-CMD ["sh", "-c", "./railway-setup.sh && node dist/index.js"]
+CMD ["node", "dist/index.js"]
