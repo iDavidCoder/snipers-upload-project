@@ -7,7 +7,7 @@ import { listFolderVideos, downloadToTmp, getFileMeta } from "../services/drive.
 import { uploadVideo } from "../services/youtube.js";
 import { insertRequest } from "../services/supabase.js";
 import express from "express";
-import { downloadAndUploadAudio, cleanupOldAudios } from "../services/youtubeAudioDefinitivo.js";
+import { YouTubeAudioService } from '../services/youtube.js';
 import { promises as fs } from "fs";
 import path from "path";
 import { env } from "../config/env.js";
@@ -94,11 +94,23 @@ webhook.post("/youtube-audio", async (req, res) => {
   const { yt_url } = parsed.data;
 
   try {
-    const audioUrl = await downloadAndUploadAudio(yt_url);
+    const youtubeService = new YouTubeAudioService();
+    
+    // Download do áudio
+    const { filePath, fileName } = await youtubeService.downloadAudio(yt_url);
+    
+    // Servir o arquivo estaticamente
+    const publicUrl = `${req.protocol}://${req.get('host')}/tmp/${fileName}`;
+    
+    // Limpar arquivo após 5 minutos
+    setTimeout(() => {
+      youtubeService.cleanupFile(filePath);
+    }, 5 * 60 * 1000);
+    
     return res.status(200).json({ 
       success: true, 
-      audioUrl,
-      message: "Áudio processado e enviado para Supabase Storage com sucesso"
+      audioUrl: publicUrl,
+      message: "Áudio baixado com sucesso usando yt-dlp"
     });
   } catch (e: any) {
     return res.status(500).json({ 

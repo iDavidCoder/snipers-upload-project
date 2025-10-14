@@ -1,4 +1,4 @@
-import { downloadAndUploadAudio } from '../services/youtubeAudio.js';
+import { downloadAndUploadAudio } from '../services/youtubeAudioDefinitivo.js';
 // Script de teste para verificar se as mudanças resolvem o problema de cookies
 async function testYouTubeDownload() {
     try {
