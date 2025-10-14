@@ -22,7 +22,6 @@ COPY src ./src
 
 # Verificar se cookies existem e copiar
 COPY .env .env
-COPY src/cookies.txt src/cookies.txt
 
 # Instalar ALL dependencies (including devDependencies for build)
 RUN npm ci
