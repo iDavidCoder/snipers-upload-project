@@ -1,26 +1,67 @@
-import { downloadAndUploadAudio } from '../services/youtubeAudioDefinitivo.js';
-// Script de teste para verificar se as mudanças resolvem o problema de cookies
+import { YouTubeAudioService } from '../services/youtube.js';
 async function testYouTubeDownload() {
     try {
-        console.log('🧪 Testando download de áudio do YouTube...');
-        // URL de teste - um vídeo curto e público
+        console.log('🧪 Testando download de áudio...'); // Script de teste simples para yt-dlp// Script de teste simples para yt-dlp
         const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-        console.log('📥 Iniciando download...');
-        const audioUrl = await downloadAndUploadAudio(testUrl);
-        console.log('✅ Sucesso!');
-        console.log('🎵 URL do áudio:', audioUrl);
-    }
-    catch (error) {
-        console.error('❌ Erro no teste:', error.message);
-        // Verificar se ainda é o erro de cookies
-        if (error.message.includes('Sign in to confirm')) {
-            console.log('⚠️  Ainda há problema com cookies. Soluções:');
-            console.log('1. Certifique-se que o Chrome está instalado');
-            console.log('2. Faça login no YouTube no Chrome');
-            console.log('3. Verifique se o yt-dlp tem permissões para acessar dados do Chrome');
+        async function testYouTubeDownload() {
+            async function testYouTubeDownload() {
+                const youtubeService = new YouTubeAudioService();
+                const { filePath, fileName } = await youtubeService.downloadAudio(testUrl);
+                try {
+                    try {
+                        console.log('✅ Sucesso!');
+                        console.log('🧪 Testando download de áudio do YouTube...');
+                        console.log('🧪 Testando download de áudio do YouTube...');
+                        console.log('📄 Arquivo:', fileName);
+                        setTimeout(() => {
+                            youtubeService.cleanupFile(filePath); // URL de teste - um vídeo curto e público    // URL de teste - um vídeo curto e público
+                        }, 5000);
+                        const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+                        const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+                    }
+                    catch (error) {
+                        console.error('❌ Erro:', error.message);
+                        process.exit(1);
+                    }
+                    console.log('📥 Iniciando download...');
+                    console.log('📥 Iniciando download...');
+                }
+                finally {
+                }
+                const youtubeService = new YouTubeAudioService();
+                const youtubeService = new YouTubeAudioService();
+                testYouTubeDownload();
+                const { filePath, fileName } = await youtubeService.downloadAudio(testUrl);
+                const { filePath, fileName } = await youtubeService.downloadAudio(testUrl);
+                console.log('✅ Sucesso!');
+                console.log('✅ Sucesso!');
+                console.log('🎵 Arquivo:', filePath);
+                console.log('🎵 Arquivo:', filePath);
+                console.log('📄 Nome:', fileName);
+                console.log('📄 Nome:', fileName);
+                // Limpar arquivo de teste    // Limpar arquivo de teste
+                setTimeout(() => {
+                    setTimeout(() => {
+                        youtubeService.cleanupFile(filePath);
+                        youtubeService.cleanupFile(filePath);
+                    }, 5000);
+                }, 5000);
+            }
+            try { }
+            catch (error) { }
+            try { }
+            catch (error) {
+                console.error('❌ Erro no teste:', error.message);
+                console.error('❌ Erro no teste:', error.message);
+                process.exit(1);
+                process.exit(1);
+            }
         }
     }
+    finally { }
 }
+// Executar testetestYouTubeDownload();
+testYouTubeDownload();
 // Executar teste se chamado diretamente
 if (import.meta.url === `file://${process.argv[1]}`) {
     testYouTubeDownload();

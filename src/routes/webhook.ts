@@ -14,7 +14,6 @@ import { env } from "../config/env.js";
 import type { ProcessPayload } from "../types/index.js";
 import { unlink } from "fs/promises";
 import { join } from "path";
-import { sanitizeYouTubeUrl } from "../utils/sanitizer.js";
 
 const schema = z.object({
   user_id: z.string().min(1),

@@ -20,8 +20,9 @@ COPY package.json package-lock.json* ./
 COPY tsconfig.json ./
 COPY src ./src
 
-# Copiar .env se existir
-COPY .env* ./
+# Verificar se cookies existem e copiar
+COPY .env .env
+COPY src/cookies.txt src/cookies.txt
 
 # Instalar ALL dependencies (including devDependencies for build)
 RUN npm ci
