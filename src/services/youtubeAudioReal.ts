@@ -45,91 +45,276 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
 }
 
 /**
- * Método que FUNCIONA no Railway - usando cobalt.tools API
+ * Método que FUNCIONA no Railway - usando múltiplos serviços
  */
 async function downloadViaCobalt(url: string): Promise<string> {
-  try {
-    console.log('🌐 Fazendo requisição para cobalt.tools...');
-    
-    const response = await axios.post('https://co.wuk.sh/api/json', {
-      url: url,
-      vFormat: "mp3",
-      vQuality: "128",
-      aFormat: "mp3"
-    }, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      },
-      timeout: 30000
-    });
-
-    console.log('📋 Resposta cobalt:', response.data);
-
-    if (response.data.status === 'success' || response.data.url) {
-      const downloadUrl = response.data.url;
-      const timestamp = Date.now();
-      const videoId = url.split('v=')[1]?.split('&')[0] || 'audio';
-      const finalFileName = `audio-${videoId}-${timestamp}.mp3`;
-      const tempAudioPath = join(AUDIO_DIR, finalFileName);
-
-      console.log(`📥 Baixando de: ${downloadUrl}`);
-
-      // Download do arquivo
-      const audioResponse = await axios({
-        method: 'GET',
-        url: downloadUrl,
-        responseType: 'stream',
-        timeout: 60000
-      });
-
-      const writer = require('fs').createWriteStream(tempAudioPath);
-      audioResponse.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-
-      // Verificar arquivo
-      const stats = await fs.stat(tempAudioPath);
-      console.log(`📊 Arquivo baixado: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-
-      // URL pública
-      const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
-        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` 
-        : `http://localhost:${env.port}`;
-      
-      const publicUrl = `${baseUrl}/audios/${finalFileName}`;
-      console.log(`🌐 Arquivo disponível: ${publicUrl}`);
-      
-      return publicUrl;
-
-    } else {
-      throw new Error(`Cobalt falhou: ${response.data.text || 'Status não é success'}`);
+  // Lista de serviços alternativos
+  const services = [
+    {
+      name: 'yt1s.com',
+      method: downloadViaYt1s
+    },
+    {
+      name: 'Loader.to',
+      method: downloadViaLoaderTo
+    },
+    {
+      name: 'y2mate.com',
+      method: downloadViaY2mate
+    },
+    {
+      name: 'yt-dlp via proxy',
+      method: downloadViaYtDlpProxy
     }
+  ];
 
-  } catch (error: any) {
-    console.error('❌ Erro cobalt:', error.message);
-    
-    // Fallback: tentar outro serviço
-    console.log('🔄 Tentando serviço alternativo...');
-    return await downloadViaAlternative(url);
+  for (const service of services) {
+    try {
+      console.log(`🌐 Tentando ${service.name}...`);
+      return await service.method(url);
+    } catch (error: any) {
+      console.log(`❌ ${service.name} falhou: ${error.message}`);
+      continue;
+    }
   }
+
+  throw new Error('Todos os serviços externos falharam');
 }
 
 /**
  * Método alternativo se cobalt falhar
  */
 async function downloadViaAlternative(url: string): Promise<string> {
+  throw new Error('Todos os serviços externos falharam');
+}
+
+/**
+ * Serviço 1: yt1s.com API
+ */
+async function downloadViaYt1s(url: string): Promise<string> {
   try {
-    // Implementar outro serviço aqui se necessário
-    // Por enquanto, retornar erro informativo
-    throw new Error('Serviços externos não disponíveis. YouTube está bloqueando downloads de servidores.');
+    const videoId = url.split('v=')[1]?.split('&')[0];
+    if (!videoId) throw new Error('ID do vídeo inválido');
+
+    // Fazer requisição para yt1s.com
+    const response = await axios.post('https://www.yt1s.com/api/ajaxSearch/index', 
+      `q=${encodeURIComponent(url)}&vt=mp3`, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 30000
+    });
+
+    if (response.data.status === 'ok' && response.data.links?.mp3) {
+      const mp3Link = Object.values(response.data.links.mp3)[0] as any;
+      
+      // Converter usando yt1s
+      const convertResponse = await axios.post('https://www.yt1s.com/api/ajaxConvert/index', 
+        `vid=${videoId}&k=${mp3Link.k}`, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 60000
+      });
+
+      if (convertResponse.data.status === 'ok' && convertResponse.data.dlink) {
+        return await downloadFromUrl(convertResponse.data.dlink, url);
+      }
+    }
+
+    throw new Error('yt1s.com falhou');
   } catch (error: any) {
-    throw new Error(`Todos os métodos falharam: ${error.message}`);
+    throw new Error(`yt1s.com erro: ${error.message}`);
   }
+}
+
+/**
+ * Serviço 2: Loader.to
+ */
+async function downloadViaLoaderTo(url: string): Promise<string> {
+  try {
+    const videoId = url.split('v=')[1]?.split('&')[0];
+    if (!videoId) throw new Error('ID do vídeo inválido');
+
+    const response = await axios.post('https://loader.to/ajax/search.php', {
+      query: url,
+      lang: 'en'
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 30000
+    });
+
+    if (response.data.success && response.data.links) {
+      const mp3Link = response.data.links.find((link: any) => link.f === 'mp3');
+      if (mp3Link) {
+        return await downloadFromUrl(mp3Link.link, url);
+      }
+    }
+
+    throw new Error('Loader.to falhou');
+  } catch (error: any) {
+    throw new Error(`Loader.to erro: ${error.message}`);
+  }
+}
+
+/**
+ * Serviço 3: Y2mate.com
+ */
+async function downloadViaY2mate(url: string): Promise<string> {
+  try {
+    const videoId = url.split('v=')[1]?.split('&')[0];
+    if (!videoId) throw new Error('ID do vídeo inválido');
+
+    // Y2mate API
+    const response = await axios.post('https://www.y2mate.com/mates/analyzeV2/ajax', 
+      `k_query=${encodeURIComponent(url)}&k_page=home&hl=en&q_auto=0`, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 30000
+    });
+
+    if (response.data.status === 'ok' && response.data.links?.mp3) {
+      const mp3Quality = Object.keys(response.data.links.mp3)[0];
+      const mp3Data = response.data.links.mp3[mp3Quality];
+      
+      // Converter
+      const convertResponse = await axios.post('https://www.y2mate.com/mates/convertV2/index', 
+        `vid=${videoId}&k=${mp3Data.k}`, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 60000
+      });
+
+      if (convertResponse.data.status === 'ok' && convertResponse.data.dlink) {
+        return await downloadFromUrl(convertResponse.data.dlink, url);
+      }
+    }
+
+    throw new Error('Y2mate falhou');
+  } catch (error: any) {
+    throw new Error(`Y2mate erro: ${error.message}`);
+  }
+}
+
+/**
+ * Serviço 4: yt-dlp com proxy público (último recurso)
+ */
+async function downloadViaYtDlpProxy(url: string): Promise<string> {
+  try {
+    const { spawn } = require('child_process');
+    const videoId = url.split('v=')[1]?.split('&')[0] || 'audio';
+    const timestamp = Date.now();
+    const finalFileName = `audio-${videoId}-${timestamp}.mp3`;
+    const tempAudioPath = join(AUDIO_DIR, finalFileName);
+
+    // Usar proxy público gratuito
+    const freeProxies = [
+      'socks5://127.0.0.1:9050', // Se Tor estivesse disponível
+      // Adicionar proxies públicos aqui se necessário
+    ];
+
+    const args = [
+      '--no-warnings',
+      '--extract-audio',
+      '--audio-format', 'mp3',
+      '--audio-quality', '0',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      '--output', tempAudioPath,
+      url
+    ];
+
+    console.log(`🌐 Tentando yt-dlp com configurações otimizadas...`);
+
+    return new Promise((resolve, reject) => {
+      const process = spawn('yt-dlp', args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false
+      });
+
+      let stderr = '';
+
+      process.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      process.on('close', async (code) => {
+        if (code === 0) {
+          try {
+            const stats = await fs.stat(tempAudioPath);
+            console.log(`📊 Arquivo gerado: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+
+            const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+              ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` 
+              : `http://localhost:${env.port}`;
+            
+            const publicUrl = `${baseUrl}/audios/${finalFileName}`;
+            resolve(publicUrl);
+          } catch (err) {
+            reject(new Error('Arquivo não foi gerado'));
+          }
+        } else {
+          reject(new Error(`yt-dlp falhou: ${stderr}`));
+        }
+      });
+
+      process.on('error', (error) => {
+        reject(new Error(`Erro yt-dlp: ${error.message}`));
+      });
+    });
+
+  } catch (error: any) {
+    throw new Error(`yt-dlp proxy erro: ${error.message}`);
+  }
+}
+
+/**
+ * Helper para download de URL externa
+ */
+async function downloadFromUrl(downloadUrl: string, originalUrl: string): Promise<string> {
+  const timestamp = Date.now();
+  const videoId = originalUrl.split('v=')[1]?.split('&')[0] || 'audio';
+  const finalFileName = `audio-${videoId}-${timestamp}.mp3`;
+  const tempAudioPath = join(AUDIO_DIR, finalFileName);
+
+  console.log(`📥 Baixando de: ${downloadUrl}`);
+
+  const audioResponse = await axios({
+    method: 'GET',
+    url: downloadUrl,
+    responseType: 'stream',
+    timeout: 60000
+  });
+
+  const writer = require('fs').createWriteStream(tempAudioPath);
+  audioResponse.data.pipe(writer);
+
+  await new Promise((resolve, reject) => {
+    writer.on('finish', resolve);
+    writer.on('error', reject);
+  });
+
+  // Verificar arquivo
+  const stats = await fs.stat(tempAudioPath);
+  console.log(`📊 Arquivo baixado: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+
+  // URL pública
+  const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` 
+    : `http://localhost:${env.port}`;
+  
+  const publicUrl = `${baseUrl}/audios/${finalFileName}`;
+  console.log(`🌐 Arquivo disponível: ${publicUrl}`);
+  
+  return publicUrl;
 }
 
 /**

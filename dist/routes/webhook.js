@@ -6,7 +6,7 @@ import { extractDriveId } from "../utils/extractDriveId.js";
 import { listFolderVideos, downloadToTmp, getFileMeta } from "../services/drive.js";
 import { uploadVideo } from "../services/youtube.js";
 import { insertRequest } from "../services/supabase.js";
-import { downloadAndUploadAudio } from "../services/youtubeAudioReal.js";
+import { downloadAndUploadAudio } from "../services/youtubeAudioDefinitivo.js";
 import { env } from "../config/env.js";
 import { unlink } from "fs/promises";
 import { join } from "path";

@@ -7,7 +7,7 @@ import { listFolderVideos, downloadToTmp, getFileMeta } from "../services/drive.
 import { uploadVideo } from "../services/youtube.js";
 import { insertRequest } from "../services/supabase.js";
 import express from "express";
-import { downloadAndUploadAudio, cleanupOldAudios } from "../services/youtubeAudioReal.js";
+import { downloadAndUploadAudio, cleanupOldAudios } from "../services/youtubeAudioDefinitivo.js";
 import { promises as fs } from "fs";
 import path from "path";
 import { env } from "../config/env.js";
