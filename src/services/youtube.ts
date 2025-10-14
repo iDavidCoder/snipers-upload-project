@@ -25,25 +25,22 @@ export class YouTubeAudioService {
     const outputPath = path.join(this.downloadDir, fileName);
 
     try {
-      // Para Railway - tentar com cookies do Chrome primeiro
-      let command = `yt-dlp --cookies-from-browser chrome -x --audio-format mp3 --audio-quality 5 -o "${outputPath}" "${url}"`;
+      // Estratégia para Railway - User-Agent real + headers
+      const command = `yt-dlp ` +
+        `--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36" ` +
+        `--add-header "Accept-Language:en-US,en;q=0.9" ` +
+        `--add-header "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" ` +
+        `--sleep-interval 1 ` +
+        `--max-sleep-interval 3 ` +
+        `-x --audio-format mp3 --audio-quality 5 ` +
+        `-o "${outputPath}" "${url}"`;
       
-      console.log('Downloading with yt-dlp (with cookies):', command);
+      console.log('Downloading with enhanced yt-dlp...');
       
-      try {
-        await execAsync(command, { 
-          timeout: 60000,
-          env: { ...process.env }
-        });
-      } catch (cookieError) {
-        console.warn('Cookie method failed, trying without cookies:', cookieError);
-        // Fallback sem cookies
-        command = `yt-dlp -x --audio-format mp3 --audio-quality 5 -o "${outputPath}" "${url}"`;
-        await execAsync(command, { 
-          timeout: 60000,
-          env: { ...process.env }
-        });
-      }
+      await execAsync(command, { 
+        timeout: 90000, // 90 segundos
+        env: { ...process.env }
+      });
 
       // Verificar se o arquivo foi criado
       await fs.access(outputPath);
@@ -55,6 +52,36 @@ export class YouTubeAudioService {
 
     } catch (error: any) {
       console.error('Error downloading audio:', error);
+      
+      // Se ainda falhar, tentar estratégia alternativa
+      if (error.message.includes('Sign in to confirm')) {
+        console.log('Trying alternative extraction method...');
+        
+        try {
+          const altCommand = `yt-dlp ` +
+            `--extractor-args "youtube:player_client=web" ` +
+            `--user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" ` +
+            `-x --audio-format mp3 --audio-quality 5 ` +
+            `-o "${outputPath}" "${url}"`;
+            
+          await execAsync(altCommand, { 
+            timeout: 90000,
+            env: { ...process.env }
+          });
+          
+          await fs.access(outputPath);
+          
+          return {
+            filePath: outputPath,
+            fileName
+          };
+          
+        } catch (altError) {
+          console.error('Alternative method also failed:', altError);
+          throw new Error(`YouTube download failed - bot detection active. Try again in a few minutes.`);
+        }
+      }
+      
       throw new Error(`Failed to download audio: ${error.message}`);
     }
   }

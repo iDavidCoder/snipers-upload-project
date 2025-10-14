@@ -76,19 +76,21 @@ webhook.post("/youtube-audio", async (req, res) => {
     }
     const { yt_url } = parsed.data;
     try {
+        // Rate limiting simples - esperar um pouco entre requests
+        await new Promise(resolve => setTimeout(resolve, 2000));
         const youtubeService = new YouTubeAudioService();
         // Download do áudio
         const { filePath, fileName } = await youtubeService.downloadAudio(yt_url);
         // Servir o arquivo estaticamente
         const publicUrl = `${req.protocol}://${req.get('host')}/tmp/${fileName}`;
-        // Limpar arquivo após 5 minutos
+        // Limpar arquivo após 10 minutos
         setTimeout(() => {
             youtubeService.cleanupFile(filePath);
-        }, 5 * 60 * 1000);
+        }, 10 * 60 * 1000);
         return res.status(200).json({
             success: true,
             audioUrl: publicUrl,
-            message: "Áudio baixado com sucesso usando yt-dlp"
+            message: "Áudio baixado com sucesso"
         });
     }
     catch (e) {

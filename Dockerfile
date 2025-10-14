@@ -1,25 +1,19 @@
-# Dockerfile para Railway com yt-dlp e cookies
+# Dockerfile para Railway com yt-dlp otimizado
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Instalar dependências do sistema incluindo Chromium para cookies
+# Instalar dependências do sistema
 RUN apk update && apk add --no-cache \
     python3 \
     py3-pip \
     ffmpeg \
     curl \
     ca-certificates \
-    bash \
-    chromium \
-    chromium-chromedriver
+    bash
 
-# Instalar yt-dlp
+# Instalar yt-dlp mais recente
 RUN python3 -m pip install --upgrade --break-system-packages yt-dlp
-
-# Configurar Chromium para container
-ENV CHROME_BIN=/usr/bin/chromium-browser
-ENV CHROME_PATH=/usr/bin/chromium-browser
 
 # Copiar arquivos do projeto
 COPY package.json package-lock.json* ./
