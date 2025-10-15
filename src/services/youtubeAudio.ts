@@ -14,42 +14,18 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
       throw new Error("URL do YouTube inválida");
     }
 
-    // Validar suporte a cookies do yt-dlp
-    const cookiesSupported = await validateYtDlpCookiesSupport();
-    console.log(`Suporte a cookies do yt-dlp: ${cookiesSupported ? 'Sim' : 'Não'}`);
+    // Usar cookies diretos do arquivo
+    const cookiesPath = join(process.cwd(), "cookies.txt");
+    console.log(`Usando cookies do arquivo: ${cookiesPath}`);
 
-    // Detectar configuração de cookies
-    let cookiesConfig = null;
-    if (cookiesSupported) {
-      if (env.youtube.cookiesPath) {
-        // Usar configuração manual
-        cookiesConfig = {
-          browser: env.youtube.cookiesFromBrowser,
-          path: env.youtube.cookiesPath
-        };
-        console.log(`Usando configuração manual de cookies: ${cookiesConfig.browser}:${cookiesConfig.path}`);
-      } else {
-        // Detectar automaticamente
-        cookiesConfig = await detectCookiesPath();
-        if (cookiesConfig) {
-          console.log(`Configuração de cookies detectada automaticamente: ${cookiesConfig.browser}${cookiesConfig.path ? ':' + cookiesConfig.path : ''}`);
-        }
-      }
-    }
-
-    // Configurar argumentos do yt-dlp com cookies
+    // Configurar argumentos do yt-dlp com cookies diretos
     const getYtDlpArgs = (additionalArgs: string[] = []) => {
-      const baseArgs = ["--no-warnings"];
+      const baseArgs = [
+        "--no-warnings",
+        "--cookies", cookiesPath
+      ];
       
-      // Adicionar argumentos de cookies se disponível
-      if (cookiesConfig) {
-        const cookiesArgs = getCookiesArgs(cookiesConfig);
-        baseArgs.push(...cookiesArgs);
-        console.log(`Argumentos de cookies adicionados: ${cookiesArgs.join(' ')}`);
-      } else {
-        console.log("Nenhuma configuração de cookies disponível - pode falhar em vídeos com restrições");
-      }
-      
+      console.log(`Usando cookies do arquivo: ${cookiesPath}`);
       return [...baseArgs, ...additionalArgs];
     };
 

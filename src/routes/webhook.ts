@@ -7,6 +7,7 @@ import { listFolderVideos, downloadToTmp, getFileMeta } from "../services/drive.
 import { uploadVideo } from "../services/youtube.js";
 import { insertRequest } from "../services/supabase.js";
 import { downloadAndUploadAudio } from "../services/youtubeAudio.js";
+import { downloadAudioSimple } from "../services/simpleDownload.js";
 import { env } from "../config/env.js";
 import type { ProcessPayload } from "../types/index.js";
 import { unlink } from "fs/promises";
@@ -89,11 +90,15 @@ webhook.post("/youtube-audio", async (req, res) => {
   const { yt_url } = parsed.data;
 
   try {
+    console.log(`🎯 BAIXANDO ÁUDIO: ${yt_url}`);
+    
+    // Usar yt-dlp com cookies (funcionando)
     const audioUrl = await downloadAndUploadAudio(yt_url);
+    
     return res.status(200).json({ 
       success: true, 
       audioUrl,
-      message: "Áudio processado e enviado para Supabase Storage com sucesso"
+      message: "✅ Áudio baixado com sucesso!"
     });
   } catch (e: any) {
     return res.status(500).json({ 
