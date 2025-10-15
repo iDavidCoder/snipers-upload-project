@@ -26,7 +26,8 @@ COPY package.json ./
 
 # ffmpeg e yt-dlp também no runtime
 RUN apk add --no-cache ffmpeg python3 py3-pip && \
-    pip3 install yt-dlp
+    pip3 install yt-dlp --break-system-packages
+
 
 ENV NODE_ENV=production
 CMD ["node", "dist/index.js"]
