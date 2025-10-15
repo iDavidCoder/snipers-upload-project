@@ -30,4 +30,5 @@ RUN apk add --no-cache ffmpeg python3 py3-pip && \
 
 
 ENV NODE_ENV=production
+EXPOSE 3000
 CMD ["node", "dist/index.js"]
