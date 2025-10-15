@@ -2,9 +2,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Instalar dependências do sistema
 RUN apk add --no-cache ffmpeg python3 py3-pip && \
-    pip3 install yt-dlp
+    pip3 install yt-dlp --break-system-packages
 
 # Instalar dependências Node
 COPY package.json package-lock.json* ./
