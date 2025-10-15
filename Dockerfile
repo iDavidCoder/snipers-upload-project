@@ -12,8 +12,9 @@ RUN npm ci
 # Copiar código e buildar
 COPY tsconfig.json ./
 COPY src ./src
-COPY .env .env
 RUN npm run build
+
+ENV PORT=3000
 
 # Etapa final (runtime)
 FROM node:20-alpine
