@@ -5,6 +5,7 @@ const num = (v: string | undefined, def: number) => (v ? Number(v) : def);
 
 export const env = {
   port: num(process.env.PORT, 3000),
+  baseUrl: process.env.BASE_URL || "http://localhost:3000",
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -14,7 +15,9 @@ export const env = {
   youtube: {
     privacyStatus: process.env.YOUTUBE_DEFAULT_PRIVACY || "private",
     categoryId: process.env.YOUTUBE_CATEGORY_ID || "22",
-    regionCode: process.env.YOUTUBE_REGION_CODE || "BR"
+    regionCode: process.env.YOUTUBE_REGION_CODE || "BR",
+    cookiesFromBrowser: process.env.YOUTUBE_COOKIES_FROM_BROWSER || "chrome",
+    cookiesPath: process.env.YOUTUBE_COOKIES_PATH || ""
   },
   supabase: {
     url: process.env.SUPABASE_URL || "",

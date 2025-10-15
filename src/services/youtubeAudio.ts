@@ -1,9 +1,9 @@
 import { spawn } from "child_process";
-import { createReadStream, promises as fs } from "fs";
+import { promises as fs } from "fs";
 import { join } from "path";
-import { createClient } from "@supabase/supabase-js";
 import { env } from "../config/env.js";
 import { tmpdir } from "os";
+import { detectCookiesPath, getCookiesArgs, validateYtDlpCookiesSupport } from "../utils/cookies.js";
 
 export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
   let tempAudioPath: string | undefined;
@@ -14,15 +14,53 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
       throw new Error("URL do YouTube inválida");
     }
 
+    // Validar suporte a cookies do yt-dlp
+    const cookiesSupported = await validateYtDlpCookiesSupport();
+    console.log(`Suporte a cookies do yt-dlp: ${cookiesSupported ? 'Sim' : 'Não'}`);
+
+    // Detectar configuração de cookies
+    let cookiesConfig = null;
+    if (cookiesSupported) {
+      if (env.youtube.cookiesPath) {
+        // Usar configuração manual
+        cookiesConfig = {
+          browser: env.youtube.cookiesFromBrowser,
+          path: env.youtube.cookiesPath
+        };
+        console.log(`Usando configuração manual de cookies: ${cookiesConfig.browser}:${cookiesConfig.path}`);
+      } else {
+        // Detectar automaticamente
+        cookiesConfig = await detectCookiesPath();
+        if (cookiesConfig) {
+          console.log(`Configuração de cookies detectada automaticamente: ${cookiesConfig.browser}${cookiesConfig.path ? ':' + cookiesConfig.path : ''}`);
+        }
+      }
+    }
+
+    // Configurar argumentos do yt-dlp com cookies
+    const getYtDlpArgs = (additionalArgs: string[] = []) => {
+      const baseArgs = ["--no-warnings"];
+      
+      // Adicionar argumentos de cookies se disponível
+      if (cookiesConfig) {
+        const cookiesArgs = getCookiesArgs(cookiesConfig);
+        baseArgs.push(...cookiesArgs);
+        console.log(`Argumentos de cookies adicionados: ${cookiesArgs.join(' ')}`);
+      } else {
+        console.log("Nenhuma configuração de cookies disponível - pode falhar em vídeos com restrições");
+      }
+      
+      return [...baseArgs, ...additionalArgs];
+    };
+
     // Primeiro, obter metadados do vídeo
     console.log(`Obtendo informações do vídeo: ${yt_url}`);
     
     const videoInfo = await new Promise<any>((resolve, reject) => {
-      const ytdlp = spawn("yt-dlp", [
-        "--dump-json",
-        "--no-warnings",
-        yt_url
-      ], {
+      const args = getYtDlpArgs(["--dump-json", yt_url]);
+      console.log(`Executando yt-dlp com argumentos:`, args.join(' '));
+      
+      const ytdlp = spawn("yt-dlp", args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
@@ -62,23 +100,27 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
     const videoId = videoInfo.id || Math.random().toString(36).substring(7);
     const timestamp = Date.now();
     
-    // Criar nome do arquivo final (agora pode ser MP3 já que ffmpeg está instalado)
+    // Criar nome do arquivo final e definir caminho público
     const finalFileName = `${title}-${videoId}-${timestamp}.mp3`;
+    const publicAudioPath = join(process.cwd(), "public", "audios", finalFileName);
     tempAudioPath = join(tmpdir(), finalFileName);
 
     console.log(`Baixando áudio para: ${tempAudioPath}`);
 
     // Agora baixar o áudio e converter para MP3 (ffmpeg disponível)
     await new Promise<void>((resolve, reject) => {
-      const ytdlp = spawn("yt-dlp", [
+      const downloadArgs = getYtDlpArgs([
         "--extract-audio",
         "--audio-format", "mp3",
         "--audio-quality", "0",
         "--no-playlist",
-        "--no-warnings",
         "--output", tempAudioPath!,
         yt_url
-      ], {
+      ]);
+      
+      console.log(`Executando download com argumentos: ${downloadArgs.join(' ')}`);
+      
+      const ytdlp = spawn("yt-dlp", downloadArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
@@ -131,44 +173,25 @@ export async function downloadAndUploadAudio(yt_url: string): Promise<string> {
 
     console.log(`Arquivo válido: ${stats.size} bytes`);
 
-    // Criar cliente Supabase com service role key
-    console.log(`Service Role Key existe: ${!!env.supabase.serviceRoleKey}`);
-    console.log(`Service Role Key primeiros chars: ${env.supabase.serviceRoleKey?.substring(0, 20)}...`);
+    // Mover arquivo para pasta pública em vez de fazer upload para Supabase
+    console.log(`Movendo arquivo para pasta pública: ${publicAudioPath}`);
     
-    if (!env.supabase.serviceRoleKey) {
-      throw new Error("SUPABASE_SERVICE_ROLE_KEY não encontrada nas variáveis de ambiente");
-    }
+    // Garantir que a pasta public/audios existe
+    await fs.mkdir(join(process.cwd(), "public", "audios"), { recursive: true });
     
-    const supabase = createClient(env.supabase.url, env.supabase.serviceRoleKey);
+    // Mover arquivo temporário para pasta pública
+    await fs.copyFile(tempAudioPath, publicAudioPath);
+    
+    console.log("Arquivo salvo na pasta pública com sucesso!");
 
-    console.log(`Fazendo upload para Supabase: ${finalFileName}`);
-
-    // Ler arquivo como buffer em vez de stream para evitar problemas de duplex
-    const fileBuffer = await fs.readFile(tempAudioPath);
-
-    // Upload para bucket Audios
-    const { error } = await supabase.storage
-      .from("Audios")
-      .upload(finalFileName, fileBuffer, {
-        upsert: true,
-        contentType: "audio/mpeg"
-      });
-
-    if (error) {
-      console.error("Erro detalhado do Supabase:", error);
-      throw new Error(`Erro ao fazer upload para Supabase: ${error.message}`);
-    }
-
-    console.log("Upload para Supabase concluído com sucesso!");
-
-    // Limpar arquivo temporário APENAS após upload bem-sucedido
+    // Limpar arquivo temporário APENAS após cópia bem-sucedida
     await fs.unlink(tempAudioPath).catch((err) => {
       console.warn("Aviso: não foi possível remover arquivo temporário:", err.message);
     });
 
-    // Retornar URL pública
-    const publicUrl = `${env.supabase.url}/storage/v1/object/public/Audios/${finalFileName}`;
-    console.log(`Upload concluído: ${publicUrl}`);
+    // Retornar URL público local
+    const publicUrl = `${env.baseUrl || 'http://localhost:3000'}/audios/${finalFileName}`;
+    console.log(`Arquivo disponível em: ${publicUrl}`);
     
     return publicUrl;
 
