@@ -11,6 +11,6 @@ app.use("/webhook", webhook);
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 
-app.listen(env.port, () => {
-  logger.info({ port: env.port }, "server");
+app.listen(env.port || 3000, "0.0.0.0", () => {
+  logger.info({ port: env.port || 3000 }, "server");
 });
