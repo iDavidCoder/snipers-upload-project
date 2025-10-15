@@ -1,44 +1,32 @@
-# Dockerfile para Railway com yt-dlp otimizado
-FROM node:20-alpine
-
+# Etapa de build
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Instalar dependências do sistema
-RUN apk update && apk add --no-cache \
-    python3 \
-    py3-pip \
-    ffmpeg \
-    curl \
-    ca-certificates \
-    bash
+RUN apk add --no-cache ffmpeg python3 py3-pip && \
+    pip3 install yt-dlp
 
-# Instalar yt-dlp mais recente
-RUN python3 -m pip install --upgrade --break-system-packages yt-dlp
-
-# Copiar arquivos do projeto
+# Instalar dependências Node
 COPY package.json package-lock.json* ./
-COPY tsconfig.json ./
-COPY src ./src
-
-# Verificar se cookies existem e copiar
-COPY .env .env
-
-# Instalar ALL dependencies (including devDependencies for build)
 RUN npm ci
 
-# Compilar TypeScript
+# Copiar código e buildar
+COPY tsconfig.json ./
+COPY src ./src
 RUN npm run build
 
-# Remover devDependencies para reduzir tamanho
-RUN npm prune --production
+# Etapa final (runtime)
+FROM node:20-alpine
+WORKDIR /app
 
-# Criar diretório tmp para downloads
-RUN mkdir -p tmp && chmod 777 tmp
+# Copiar apenas build e dependências
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY package.json ./
 
-# Configurar ambiente
+# ffmpeg e yt-dlp também no runtime
+RUN apk add --no-cache ffmpeg python3 py3-pip && \
+    pip3 install yt-dlp
+
 ENV NODE_ENV=production
-ENV PYTHONIOENCODING=utf-8
-
-EXPOSE 8080
-
 CMD ["node", "dist/index.js"]

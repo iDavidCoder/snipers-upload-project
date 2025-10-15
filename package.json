@@ -7,8 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
-    "get-refresh-token": "tsx -r dotenv/config src/scripts/get-refresh-token.ts",
-    "test-youtube": "tsx -r dotenv/config src/scripts/test-youtube.ts"
+    "get-refresh-token": "tsx -r dotenv/config src/scripts/get-refresh-token.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

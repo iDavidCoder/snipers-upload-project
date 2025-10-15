@@ -1,0 +1,5 @@
+$env:GOOGLE_CLIENT_ID="175140109046-gtcnk1drfm99onnglo4u4ala4vd4v8pp.apps.googleusercontent.com"
+$env:GOOGLE_CLIENT_SECRET="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"
+$env:GOOGLE_REDIRECT_URI="http://localhost:3000/oauth2callback"
+
+npx tsx -r dotenv/config scripts/get-refresh-token.ts

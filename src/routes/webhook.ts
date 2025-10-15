@@ -6,14 +6,10 @@ import { extractDriveId } from "../utils/extractDriveId.js";
 import { listFolderVideos, downloadToTmp, getFileMeta } from "../services/drive.js";
 import { uploadVideo } from "../services/youtube.js";
 import { insertRequest } from "../services/supabase.js";
-import express from "express";
-import { YouTubeAudioService } from '../services/youtube.js';
-import { promises as fs } from "fs";
-import path from "path";
+import { downloadAndUploadAudio } from "../services/youtubeAudio.js";
 import { env } from "../config/env.js";
 import type { ProcessPayload } from "../types/index.js";
 import { unlink } from "fs/promises";
-import { join } from "path";
 
 const schema = z.object({
   user_id: z.string().min(1),
@@ -93,26 +89,11 @@ webhook.post("/youtube-audio", async (req, res) => {
   const { yt_url } = parsed.data;
 
   try {
-    // Rate limiting simples - esperar um pouco entre requests
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const youtubeService = new YouTubeAudioService();
-    
-    // Download do áudio
-    const { filePath, fileName } = await youtubeService.downloadAudio(yt_url);
-    
-    // Servir o arquivo estaticamente
-    const publicUrl = `${req.protocol}://${req.get('host')}/tmp/${fileName}`;
-    
-    // Limpar arquivo após 10 minutos
-    setTimeout(() => {
-      youtubeService.cleanupFile(filePath);
-    }, 10 * 60 * 1000);
-    
+    const audioUrl = await downloadAndUploadAudio(yt_url);
     return res.status(200).json({ 
       success: true, 
-      audioUrl: publicUrl,
-      message: "Áudio baixado com sucesso"
+      audioUrl,
+      message: "Áudio processado e enviado para Supabase Storage com sucesso"
     });
   } catch (e: any) {
     return res.status(500).json({ 
@@ -141,7 +122,7 @@ webhook.post("/test-ytdlp", async (req, res) => {
         yt_url
       ], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: false, // Removido shell: true para evitar problemas de sintaxe
+        shell: true,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       });
 
@@ -182,36 +163,6 @@ webhook.post("/test-ytdlp", async (req, res) => {
     return res.status(500).json({ 
       error: e.message,
       stack: e.stack
-    });
-  }
-});
-
-// Endpoint para deletar arquivo de áudio após processamento
-webhook.delete("/audio/:filename", async (req, res) => {
-  try {
-    const { filename } = req.params;
-    
-    // Validar nome do arquivo para segurança
-    if (!filename || !/^[a-zA-Z0-9\-_.]+\.mp3$/.test(filename)) {
-      return res.status(400).json({ error: "Nome de arquivo inválido" });
-    }
-    
-    const filePath = join(process.cwd(), "public", "audios", filename);
-    
-    await unlink(filePath);
-    
-    return res.json({ 
-      success: true, 
-      message: `Arquivo ${filename} removido com sucesso` 
-    });
-    
-  } catch (e: any) {
-    if (e.code === 'ENOENT') {
-      return res.status(404).json({ error: "Arquivo não encontrado" });
-    }
-    
-    return res.status(500).json({ 
-      error: e.message 
     });
   }
 });
